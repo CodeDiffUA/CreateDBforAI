@@ -6,11 +6,13 @@ from bs4 import BeautifulSoup
 import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
+from time import sleep
 
-#todo make headless
+# todo make headless
 
 options = Options()
-options.headless = True
+# options.add_argument(r"load-extension=./adblock.crx")
+# options.headless = True
 load_dotenv()
 connection_string = os.getenv('DATABASE_URL')
 conn = psycopg2.connect(connection_string)
@@ -44,10 +46,13 @@ def parse_data(links):
         except:
             continue
         browser.find_element(By.XPATH, f'//*[@id="tasks-numbers"]/span[{spans[-1].text}]').click()
+        sleep(1)
         try:
             browser.find_element(By.XPATH, f'//*[@id="q_form_{spans[-1].text}"]/div[7]/div[2]/span').click()
+            sleep(1)
         except:
             browser.find_element(By.XPATH, f'//*[@id="q_form_{spans[-1].text}"]/div[8]/div[2]/span').click()
+            sleep(1)
         content = browser.page_source
         soup = BeautifulSoup(content, 'html.parser')
         tasks = soup.findAll('div', {'class': 'task-card'})
@@ -59,14 +64,23 @@ def parse_data(links):
             question = format_html(question)
             answers = soup.find('div', {'id': f'q{j}'}).findAll('div', {'class': 'answer'})
             answer_list = []
+            # print(answers)
+            # print()
             for answer in answers:
-                answer = format_html(str(answer))
+                answer = format_html(str(answer))[1:]
                 answer_list.append(answer)
-            create_dict(subject, question, chapter, theme)
-            #correct_answer = str((soup.find('div', {'id': f'q{j}'}).find('table', {'class': 'select-answers-variants'})))
-            #print(correct_answer)
-            #for ii in correct_answer:
-            #p = re.findall("class=\"marker\"|class=\"marker ok\"", correct_answer)
+            correct_answers = str(
+                (soup.find('div', {'id': f'q{j}'}).find('table', {'class': 'select-answers-variants'})))
+
+            p = re.findall("class=\"marker\"|class=\"marker ok\"", correct_answers)
+            correct_answer_iterator = 0
+            for ii in p:
+                if ii == 'class=\"marker ok\"':
+                    break
+                correct_answer_iterator += 1
+
+            create_dict(subject, question, chapter, theme, answer_list, answer_list[correct_answer_iterator])
+
             # #todo idk how to change link after pressing button
             # #todo add vidpovidnosti to answers
             # #todo explanation
@@ -88,30 +102,52 @@ def format_html(html_string):
     y = re.findall("<style>.*</style>", html_string)
     for m in y:
         html_string = html_string.replace(m, "")
-    x = re.findall("<.*>", html_string)
-    for c in x:
-        html_string = html_string.replace(c, "")
+    # x = re.findall("<.*>", html_string)
+    # for c in x:
+    #     html_string = html_string.replace(c, "")
+    while html_string.find("<") != -1:
+        left = html_string.find("<")
+        right = html_string.find(">")
+        html_string = html_string.replace(html_string[left: right + 1], "")
+    return html_string
     return html_string
 
 
-
-def create_dict(subject, question, chapter, theme):
+def create_dict(subject, question, chapter, theme, answer_list, correct_answer):
     data = {"subject": subject.replace("\'", "`"),
             "question": question.replace("\'", "`"),
             "chapter": chapter.replace("\'", "`"),
             "theme": theme.replace("\'", "`"),
-    }
+            "answer1": answer_list[0].replace("\'", "`"),
+            "answer2": answer_list[1].replace("\'", "`"),
+            "answer3": answer_list[2].replace("\'", "`"),
+            "answer4": answer_list[3].replace("\'", "`"),
+            "correct_answer": correct_answer.replace("\'", "`"),
+            }
     connect_to_db(data)
 
 
 def connect_to_db(data):
-    cur.execute(f"INSERT INTO ukrmova (subject, question, chapter, theme) VALUES ('{data['subject']}', '{data['question']}', '{data['chapter']}', '{data['theme']}')")
+    cur.execute(
+        f"INSERT INTO ukrmova (subject, question, chapter, theme, answer1, answer2, answer3, answer4, correct_answer) "
+        f"VALUES ('{data['subject']}', '{data['question']}', '{data['chapter']}', '{data['theme']}', '{data['answer1']}', '{data['answer2']}', '{data['answer3']}', '{data['answer4']}', '{data['correct_answer']}')")
     conn.commit()
 
 
 def main():
     cur.execute("DROP TABLE IF EXISTS ukrmova")
-    cur.execute("CREATE TABLE ukrmova (subject VARCHAR(9000), question VARCHAR(9000), chapter VARCHAR(9000), theme VARCHAR(9000))")
+
+    cur.execute("CREATE TABLE ukrmova ("
+                "subject VARCHAR(9000),"
+                "question VARCHAR(9000),"
+                "chapter VARCHAR(9000),"
+                "theme VARCHAR(9000),"
+                "answer1 VARCHAR(9000),"
+                "answer2 VARCHAR(9000),"
+                "answer3 VARCHAR(9000),"
+                "answer4 VARCHAR(9000),"
+                "correct_answer VARCHAR(9000))"
+                )
     conn.commit()
     parse_data(parse_links())
     cur.close()
