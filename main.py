@@ -8,11 +8,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.firefox.options import Options
 from time import sleep
 
-# todo make headless
 
 options = Options()
-# options.add_argument(r"load-extension=./adblock.crx")
-# options.headless = True
 load_dotenv()
 connection_string = os.getenv('DATABASE_URL')
 conn = psycopg2.connect(connection_string)
@@ -37,6 +34,7 @@ def parse_links():
 
 def parse_data(links):
     browser = webdriver.Firefox(options=options)
+    browser.set_window_size(5920, 6000)
     for i in links:
         browser.get(f"https://zno.osvita.ua{i}")
         content = browser.page_source
@@ -46,13 +44,13 @@ def parse_data(links):
         except:
             continue
         browser.find_element(By.XPATH, f'//*[@id="tasks-numbers"]/span[{spans[-1].text}]').click()
-        sleep(1)
+        sleep(4)
         try:
             browser.find_element(By.XPATH, f'//*[@id="q_form_{spans[-1].text}"]/div[7]/div[2]/span').click()
-            sleep(1)
+            sleep(4)
         except:
             browser.find_element(By.XPATH, f'//*[@id="q_form_{spans[-1].text}"]/div[8]/div[2]/span').click()
-            sleep(1)
+            sleep(4)
         content = browser.page_source
         soup = BeautifulSoup(content, 'html.parser')
         tasks = soup.findAll('div', {'class': 'task-card'})
@@ -64,8 +62,9 @@ def parse_data(links):
             question = format_html(question)
             answers = soup.find('div', {'id': f'q{j}'}).findAll('div', {'class': 'answer'})
             answer_list = []
-            # print(answers)
-            # print()
+            if not answers:
+                print("No answers found")
+                continue
             for answer in answers:
                 answer = format_html(str(answer))[1:]
                 answer_list.append(answer)
@@ -78,10 +77,8 @@ def parse_data(links):
                 if ii == 'class=\"marker ok\"':
                     break
                 correct_answer_iterator += 1
-
             create_dict(subject, question, chapter, theme, answer_list, answer_list[correct_answer_iterator])
 
-            # #todo idk how to change link after pressing button
             # #todo add vidpovidnosti to answers
             # #todo explanation
 
@@ -102,14 +99,10 @@ def format_html(html_string):
     y = re.findall("<style>.*</style>", html_string)
     for m in y:
         html_string = html_string.replace(m, "")
-    # x = re.findall("<.*>", html_string)
-    # for c in x:
-    #     html_string = html_string.replace(c, "")
     while html_string.find("<") != -1:
         left = html_string.find("<")
         right = html_string.find(">")
         html_string = html_string.replace(html_string[left: right + 1], "")
-    return html_string
     return html_string
 
 
