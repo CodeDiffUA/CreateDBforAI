@@ -34,11 +34,22 @@ def parse_links():
 
 def parse_data(links):
     browser = webdriver.Firefox(options=options)
-    browser.set_window_size(5920, 6000)
+    # browser.set_window_size(5920, 6000)
     for i in links:
         browser.get(f"https://zno.osvita.ua{i}")
+
+        sleep(4)
+        browser.find_element(By.XPATH, f'//*[@id="header"]/div[1]/div[2]/span[1]').click()
+        sleep(4)
+        browser.find_element(By.XPATH, f'//*[@id="floatField01"]').send_keys(os.getenv('LOGIN'))
+        browser.find_element(By.XPATH, f'//*[@id="floatField02"]').send_keys(os.getenv('PASSWORD'))
+        sleep(4)
+        browser.find_element(By.XPATH, f'//*[@id="body"]/div[6]/div/form/input').click()
+        sleep(4)
+
         content = browser.page_source
         soup = BeautifulSoup(content, 'html.parser')
+
         try:
             spans = soup.find('div', {'class': 'tasks-numbers'}).find_all('span')
         except:
@@ -82,6 +93,10 @@ def parse_data(links):
             # #todo add vidpovidnosti to answers
             # #todo explanation
 
+            print(soup.find('div', {'id': f'q{j}'}).find('div', {'class': 'two-buttons-container'}))
+            print("_______________________________")
+
+
 
 def format_html(html_string):
     html_string = html_string.replace("<strong>", "**").replace("</strong>", "**")
@@ -122,15 +137,15 @@ def create_dict(subject, question, chapter, theme, answer_list, correct_answer):
 
 def connect_to_db(data):
     cur.execute(
-        f"INSERT INTO ukrmova (subject, question, chapter, theme, answer1, answer2, answer3, answer4, correct_answer) "
+        f"INSERT INTO test_ukrmova (subject, question, chapter, theme, answer1, answer2, answer3, answer4, correct_answer) "
         f"VALUES ('{data['subject']}', '{data['question']}', '{data['chapter']}', '{data['theme']}', '{data['answer1']}', '{data['answer2']}', '{data['answer3']}', '{data['answer4']}', '{data['correct_answer']}')")
     conn.commit()
 
 
 def main():
-    cur.execute("DROP TABLE IF EXISTS ukrmova")
+    cur.execute("DROP TABLE IF EXISTS test_ukrmova")
 
-    cur.execute("CREATE TABLE ukrmova ("
+    cur.execute("CREATE TABLE test_ukrmova ("
                 "subject VARCHAR(9000),"
                 "question VARCHAR(9000),"
                 "chapter VARCHAR(9000),"
